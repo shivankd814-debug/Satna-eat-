@@ -1,0 +1,120 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == "shivank@satnaeats.com" ||
+        request.auth.token.email == "dwivedishivank365@gmail.com" ||
+        request.auth.token.admin == true ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "ADMIN"
+      );
+    }
+
+    function isRestaurantOwner(restaurantId) {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.ownerId == request.auth.uid ||
+        isSuperAdmin()
+      );
+    }
+
+    function isDeliveryPartner() {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/deliveryPartners/$(request.auth.uid)).data.isApproved == true ||
+        isSuperAdmin()
+      );
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write, update: if isOwner(userId) || isSuperAdmin();
+    }
+
+    // 2. Restaurants Collection
+    match /restaurants/{restaurantId} {
+      allow read: if true; // Publicly browsable
+      allow create: if isAuthenticated();
+      allow update: if isRestaurantOwner(restaurantId) || isSuperAdmin();
+      allow delete: if isSuperAdmin();
+
+      // Menu Subcollection
+      match /menu/{menuItemId} {
+        allow read: if true;
+        allow write: if isRestaurantOwner(restaurantId) || isSuperAdmin();
+      }
+    }
+
+    // 3. Delivery Partners Collection
+    match /deliveryPartners/{riderId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(riderId) || isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // 4. Orders Collection
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.restaurantId == request.auth.uid ||
+        resource.data.riderId == request.auth.uid ||
+        isSuperAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.restaurantId == request.auth.uid ||
+        resource.data.riderId == request.auth.uid ||
+        isSuperAdmin()
+      );
+    }
+
+    // 5. Payments Collection
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update: if isSuperAdmin();
+    }
+
+    // 6. Reviews Collection
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isSuperAdmin() || resource.data.userId == request.auth.uid;
+    }
+
+    // 7. Coupons Collection
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // 8. Notifications Collection
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.targetUserId == request.auth.uid;
+      allow write: if isSuperAdmin();
+    }
+
+    // 9. Platform Settings Collection
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // 10. Analytics Collection
+    match /analytics/{docId} {
+      allow read, write: if isSuperAdmin();
+    }
+  }
+}

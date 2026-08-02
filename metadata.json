@@ -1,0 +1,7 @@
+{
+  "name": "Satna Eats",
+  "description": "Satna Eats - Premier Food Delivery Platform for Satna & India, founded by Shivank Dwivedi",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

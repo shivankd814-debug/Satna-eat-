@@ -1,97 +1,142 @@
-github.com/shivankd814-debug/Satna-ea
+.github/workflows/build.yml
+name: Build Satna Eats APK
+on: [push]
 
-shivankd814-debug / Satna-eat-
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-Code Issues
+      - name: set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-Pull requests
+      # 1. सीक्रेट्स और एनवायरनमेंट एरर रोकने के लिए .env फ़ाइल बनाना
+      - name: Create required .env file
+        run: |
+          echo "GEMINI_API_KEY=dummy_key_for_building" > .env
+          echo "MAPS_API_KEY=dummy_key_for_building" >> .env
 
-Agents
+      # 2. गूगल सर्विसेज के एरर को रोकने के लिए एक डमी JSON फाइल डालना
+      - name: Create Dummy Google Services JSON
+        run: |
+          echo '{"project_info":{"project_number":"123","project_id":"dummy"},"client":[{"client_info":{"mobilesdk_app_id":"1:123:android:123"},"api_key":[{"current_key":"dummy"}]}]}' > app/google-services.json
 
-Actions
+      # 3. कस्टमाइज्ड कोड सिंटैक्स को हटाकर सीधे क्लीन फाइल ओवरराइट करना
+      - name: Overwrite with build-ready build.gradle.kts
+        run: |
+          cat << 'EOF' > app/build.gradle.kts
+          import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 
-Projects Wiki
+          plugins {
+            alias(libs.plugins.android.application)
+            alias(libs.plugins.kotlin.compose)
+            alias(libs.plugins.google.devtools.ksp)
+            alias(libs.plugins.roborazzi)
+            alias(libs.plugins.secrets)
+            alias(libs.plugins.google.services)
+          }
 
-Security and qua
+          android {
+            namespace = "com.example"
+            compileSdk = 36
 
-Get started with GitHub Actions
+            defaultConfig {
+              applicationId = "com.aistudio.satnaeats.mfdp"
+              minSdk = 24
+              targetSdk = 36
+              versionCode = 1
+              versionName = "1.0"
+              testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+            }
 
-Build, test, and deploy your code. Make code reviews, branch management, and issue triaging wo started.
+            signingConfigs {
+              create("release") {
+                storeFile = file("${rootDir}/my-upload-key.jks")
+                storePassword = "android"
+                keyAlias = "upload"
+                keyPassword = "android"
+              }
+            }
 
-Skip this and set up a workflow yourself →
+            buildTypes {
+              release {
+                isCrunchPngs = false
+                isMinifyEnabled = false
+                proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+                signingConfig = signingConfigs.getByName("release")
+              }
+              debug {
+                signingConfig = signingConfigs.getByName("debug")
+              }
+            }
 
-Q Search workflows
+            compileOptions {
+              sourceCompatibility = JavaVersion.VERSION_17
+              targetCompatibility = JavaVersion.VERSION_17
+            }
 
-Suggested for this repository
+            buildFeatures {
+              compose = true
+              buildConfig = true
+            }
 
-Simple workflow
+            testOptions { unitTests { isIncludeAndroidResources = true } }
+          }
 
-By GitHub
+          secrets {
+            propertiesFileName = ".env"
+            defaultPropertiesFileName = ".env.example"
+          }
 
-Start with a file with the minimum necessary structure.
+          googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
-Configure
+          dependencies {
+            implementation(platform(libs.androidx.compose.bom))
+            implementation(platform(libs.firebase.bom))
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.compose.material.icons.core)
+            implementation(libs.androidx.compose.material.icons.extended)
+            implementation(libs.androidx.compose.material3)
+            implementation(libs.androidx.compose.ui)
+            implementation(libs.androidx.compose.ui.graphics)
+            implementation(libs.androidx.compose.ui.tooling.preview)
+            implementation(libs.androidx.core.ktx)
+            implementation(libs.androidx.lifecycle.runtime.compose)
+            implementation(libs.androidx.lifecycle.runtime.ktx)
+            implementation(libs.androidx.lifecycle.viewmodel.compose)
+            implementation(libs.androidx.room.ktx)
+            implementation(libs.androidx.room.runtime)
+            implementation(libs.converter.moshi)
+            implementation(libs.firebase.ai)
+            implementation(libs.firebase.appcheck.recaptcha)
+            implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.logging.interceptor)
+            implementation(libs.moshi.kotlin)
+            implementation(libs.okhttp)
+            implementation(libs.play.services.location)
+            implementation(libs.retrofit)
+            "ksp"(libs.androidx.room.compiler)
+            "ksp"(libs.moshi.kotlin.codegen)
+          }
+          EOF
 
-Deployment
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-Deploy Node.js to Azure Web App
+      - name: Make gradlew executable
+        run: chmod +x gradlew
 
-By Microsoft Azure
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
 
-Build a Node.js project and deploy it to an Azure Web App.
-
-Deploy to Amaz By Amazon Web S
-
-Deploy a container Amazon EC2.
-
-Configure
-
-A
-
-Deployment
-
-Configure
-
-Build and Deploy to GKE
-
-By Google Cloud
-
-Build a docker container, publish it to Google Container Registry, and deploy
-
-to GKE.
-
-Configure
-
-Deployment
-
-By HashiCorp
-
-Terraform
-
-Set up Terraform C
-
-Configure
-
-Deploy to Alibaba Cloud ACK
-
-By Alibaba Cloud
-
-Deploy a container to Alibaba Cloud Container Service for Kubernetes (ACK).
-
-Deploy to IBM C By IBM
-
-Build a docker com deploy to IBM Clou
-
-Configure
-
-Deployment
-
-Configure
-
-Tencent Kubernetes Engine
-
-Ry Tencent Cloud
-
-18
-
-OpenShift
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SatnaEats-Final-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          
